@@ -114,7 +114,7 @@
 
 
         // Then load Regional GeoJSON (with popups)
-        fetch('https://iskibar2020.github.io/turkish_region_api/regional.geojson')
+        fetch('https://raw.githubusercontent.com/iskibar2020/turkish_region_api/master/regional.geojson')
             .then(response => response.json())
             .then(regionalData => {
                 const regions = L.geoJSON(regionalData, {
@@ -169,7 +169,7 @@
             });
         });
         // Load City GeoJSON first (with labels only)
-        fetch('https://iskibar2020.github.io/turkish_region_api/city.geojson')
+        fetch('https://raw.githubusercontent.com/iskibar2020/turkish_region_api/master/city.geojson')
             .then(response => response.json())
             .then(cityData => {
                 L.geoJSON(cityData, {
