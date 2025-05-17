@@ -41,10 +41,10 @@
             font-size: 11px;
             color: #000000;
             text-shadow:
-                0 0 4px rgb(255, 255, 255),
-                0 0 4px rgb(255, 255, 255),
-                0 0 4px rgb(255, 255, 255),
-                0 0 4px rgb(255, 255, 255);
+                0 0 4px #fff,
+                0 0 4px #fff,
+                0 0 4px #fff,
+                0 0 4px #fff;
             opacity: 0;
             transition: opacity 0.2s ease;
             pointer-events: none;
@@ -62,43 +62,35 @@
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
         const coordsDiv = document.getElementById('coords');
-
         map.on('mousemove', function (e) {
             const { lat, lng } = e.latlng;
             coordsDiv.textContent = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
         });
 
         const cityStyle = {
-            color: "grey",
-            weight: 1,
-            opacity: 1,
-            fillColor: "darkgrey",
-            fillOpacity: 0.25
+            color: "grey", weight: 1, opacity: 1,
+            fillColor: "darkgrey", fillOpacity: 0.25
         };
 
         const regionStyle = {
-            color: "#ff0000",
-            weight: 3,
-            opacity: 0.8,
-            fillColor: "#3388ff",
-            fillOpacity: 0.2
+            color: "#ff0000", weight: 3, opacity: 0.8,
+            fillColor: "#3388ff", fillOpacity: 0.2
         };
 
         function updateLabelVisibility() {
             const zoom = map.getZoom();
-            const labels = document.querySelectorAll('.city-label');
-            labels.forEach(label => {
+            document.querySelectorAll('.city-label').forEach(label => {
                 label.style.opacity = zoom >= 10 ? 1 : 0;
             });
         }
 
         map.on('zoomend', updateLabelVisibility);
 
-        // Load city labels
+        // First load city layer
         fetch('https://iskibar2020.github.io/turkish_region_api/city.geojson')
             .then(response => response.json())
             .then(cityData => {
@@ -116,11 +108,10 @@
                     }
                 }).addTo(map);
                 updateLabelVisibility();
-            })
-            .catch(error => console.error('Error loading city data:', error));
 
-        // Load regional data with popups
-        fetch('https://iskibar2020.github.io/turkish_region_api/regional.geojson')
+                // Then load region layer AFTER city layer is ready
+                return fetch('https://iskibar2020.github.io/turkish_region_api/regional.geojson');
+            })
             .then(response => response.json())
             .then(regionalData => {
                 const regions = L.geoJSON(regionalData, {
@@ -130,17 +121,16 @@
                             let cityListHtml = '';
                             if (Array.isArray(feature.properties.Cities)) {
                                 cityListHtml = '<hr>Cities:<ul style="padding-left:1em;margin:0;">' +
-                                    feature.properties.Cities.map(city => {
-                                        return `<li style="margin:2px 0;">
-                      <a href="#" 
-                         style="text-decoration: none; color: gray;"
-                         onmouseover="this.style.color='maroon';" 
+                                    feature.properties.Cities.map(city => `
+                    <li style="margin:2px 0;">
+                      <a href="#"
+                         style="text-decoration:none; color:gray;"
+                         onmouseover="this.style.color='maroon';"
                          onmouseout="this.style.color='gray';"
                          onclick="zoomToCity(${city.coords[0]}, ${city.coords[1]}, '${city.name.replace(/'/g, "\\'")}'); return false;">
                         ${city.name}
                       </a>
-                    </li>`;
-                                    }).join('') +
+                    </li>`).join('') +
                                     '</ul>';
                             }
 
@@ -149,8 +139,7 @@
                   <strong>${feature.properties.AreaName}</strong><br>
                   <em>${feature.properties.Title}</em><br>
                   ${cityListHtml}
-                </div>
-              `;
+                </div>`;
                             layer.bindPopup(popupHtml);
                         }
                     }
@@ -159,7 +148,7 @@
                 map.fitBounds(regions.getBounds());
             })
             .catch(error => {
-                console.error('Error loading regional data:', error);
+                console.error('Error loading map data:', error);
                 alert('Error loading map data.');
             });
 
@@ -170,10 +159,7 @@
                 fillColor: '#f03',
                 fillOpacity: 0.6,
                 color: '#900'
-            })
-                .bindPopup(`<strong>${name}</strong>`)
-                .addTo(map)
-                .openPopup();
+            }).bindPopup(`<strong>${name}</strong>`).addTo(map).openPopup();
         }
     </script>
 </body>
