@@ -22,7 +22,6 @@
             bottom: 0;
         }
 
-        /* Overlay DIV for coords */
         #coords {
             position: absolute;
             bottom: 10px;
@@ -54,41 +53,33 @@
 </head>
 
 <body>
-
     <div id="map"></div>
     <div id="coords">Lat: —, Lng: —</div>
 
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
     <script>
-        // 1) Initialize the map
         const map = L.map('map').setView([42.4072, -71.3824], 8);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution:
-                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
 
-        // 2) Grab the overlay div
         const coordsDiv = document.getElementById('coords');
 
-        // 3) Listen for mousemove, update the div’s textContent
         map.on('mousemove', function (e) {
             const { lat, lng } = e.latlng;
-            coordsDiv.textContent =
-                `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+            coordsDiv.textContent = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
         });
 
-        // Style for City Layer
         const cityStyle = {
-            color: "grey",          // Outline color
-            weight: 1,               // Outline thickness
-            opacity: 1,              // Outline opacity
-            fillColor: "darkgrey",   // Fill color
-            fillOpacity: 0.25        // Fill opacity (90%)
+            color: "grey",
+            weight: 1,
+            opacity: 1,
+            fillColor: "darkgrey",
+            fillOpacity: 0.25
         };
 
-        // Style for Regional Layer (existing)
         const regionStyle = {
             color: "#ff0000",
             weight: 3,
@@ -97,8 +88,6 @@
             fillOpacity: 0.2
         };
 
-
-        // Modify the zoomend event handler
         function updateLabelVisibility() {
             const zoom = map.getZoom();
             const labels = document.querySelectorAll('.city-label');
@@ -107,69 +96,10 @@
             });
         }
 
-        // Initial update and event listener
-        updateLabelVisibility();
         map.on('zoomend', updateLabelVisibility);
 
-
-
-        // Then load Regional GeoJSON (with popups)
-        fetch('https://raw.githubusercontent.com/iskibar2020/turkish_region_api/master/regional.geojson')
-            .then(response => response.json())
-            .then(regionalData => {
-                const regions = L.geoJSON(regionalData, {
-                    style: regionStyle,
-                    onEachFeature: function (feature, layer) {
-                        if (feature.properties.Region) {
-                            // Build clickable city list HTML
-                            let cityListHtml = '';
-                            if (Array.isArray(feature.properties.Cities)) {
-                                cityListHtml = '<hr>Cities:<ul style="padding-left:1em;margin:0;">' +
-                                    feature.properties.Cities.map(city => {
-                                        // escape quotes in city.name if needed
-                                        return `<li style="margin:2px 0;">
-            <a href="#" 
-               style="text-decoration: none; color: gray;"
-               onmouseover="this.style.color='maroon';" 
-               onmouseout="this.style.color='gray';"
-               onclick="zoomToCity(${city.coords[0]}, ${city.coords[1]}, '${city.name.replace(/'/g, "\\'")}'); return false;">
-              ${city.name}
-            </a>
-        </li>`;
-                                    }).join('') +
-                                    '</ul>';
-                            }
-
-                            // Combine region info + city list
-                            const popupHtml = `
-            <div>
-              <strong>${feature.properties.AreaName}</strong><br>
-              <em>${feature.properties.Title}</em><br>
-              ${cityListHtml}
-            </div>
-          `;
-                            layer.bindPopup(popupHtml);
-                        }
-                    }
-                }).addTo(map);
-                map.fitBounds(regions.getBounds());
-            })
-            .catch(error => {
-                console.error('Error loading regional data:', error);
-                alert('Error loading map data.');
-            });
-
-        // Add zoom level check for labels
-        map.on('zoomend', function () {
-            const zoom = map.getZoom();
-            const labels = document.querySelectorAll('.city-label');
-
-            labels.forEach(label => {
-                label.style.opacity = zoom >= 10 ? 1 : 0;
-            });
-        });
-        // Load City GeoJSON first (with labels only)
-        fetch('https://raw.githubusercontent.com/iskibar2020/turkish_region_api/master/city.geojson')
+        // Load city labels
+        fetch('https://iskibar2020.github.io/turkish_region_api/city.geojson')
             .then(response => response.json())
             .then(cityData => {
                 L.geoJSON(cityData, {
@@ -185,14 +115,56 @@
                         }
                     }
                 }).addTo(map);
+                updateLabelVisibility();
             })
             .catch(error => console.error('Error loading city data:', error));
 
-        // 3) Global helper to zoom to a given city and drop a marker
-        function zoomToCity(lat, lng, name) {
-            map.setView([lat, lng], 13);  // adjust zoom level as desired
+        // Load regional data with popups
+        fetch('https://iskibar2020.github.io/turkish_region_api/regional.geojson')
+            .then(response => response.json())
+            .then(regionalData => {
+                const regions = L.geoJSON(regionalData, {
+                    style: regionStyle,
+                    onEachFeature: function (feature, layer) {
+                        if (feature.properties.Region) {
+                            let cityListHtml = '';
+                            if (Array.isArray(feature.properties.Cities)) {
+                                cityListHtml = '<hr>Cities:<ul style="padding-left:1em;margin:0;">' +
+                                    feature.properties.Cities.map(city => {
+                                        return `<li style="margin:2px 0;">
+                      <a href="#" 
+                         style="text-decoration: none; color: gray;"
+                         onmouseover="this.style.color='maroon';" 
+                         onmouseout="this.style.color='gray';"
+                         onclick="zoomToCity(${city.coords[0]}, ${city.coords[1]}, '${city.name.replace(/'/g, "\\'")}'); return false;">
+                        ${city.name}
+                      </a>
+                    </li>`;
+                                    }).join('') +
+                                    '</ul>';
+                            }
 
-            // Optional: drop a temporary circle marker with its own popup
+                            const popupHtml = `
+                <div>
+                  <strong>${feature.properties.AreaName}</strong><br>
+                  <em>${feature.properties.Title}</em><br>
+                  ${cityListHtml}
+                </div>
+              `;
+                            layer.bindPopup(popupHtml);
+                        }
+                    }
+                }).addTo(map);
+
+                map.fitBounds(regions.getBounds());
+            })
+            .catch(error => {
+                console.error('Error loading regional data:', error);
+                alert('Error loading map data.');
+            });
+
+        function zoomToCity(lat, lng, name) {
+            map.setView([lat, lng], 13);
             L.circleMarker([lat, lng], {
                 radius: 6,
                 fillColor: '#f03',
