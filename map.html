@@ -14,6 +14,8 @@
             height: 100%;
         }
 
+        /*hello
+
         #map {
             position: absolute;
             top: 0;
@@ -69,26 +71,27 @@
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
 
-        // 2) Grab the overlay div
-        const coordsDiv = document.getElementById('coords');
+        // 2) Create custom panes for layering order
+        map.createPane('cityPane');
+        map.getPane('cityPane').style.zIndex = 400;
 
-        // 3) Listen for mousemove, update the div’s textContent
-        map.on('mousemove', function (e) {
-            const { lat, lng } = e.latlng;
-            coordsDiv.textContent =
-                `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+        map.createPane('regionPane');
+        map.getPane('regionPane').style.zIndex = 500;
+
+        // 3) Overlay coords div
+        const coordsDiv = document.getElementById('coords');
+        map.on('mousemove', e => {
+            coordsDiv.textContent = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`;
         });
 
-        // Style for City Layer
+        // Styles
         const cityStyle = {
-            color: "grey",          // Outline color
-            weight: 1,               // Outline thickness
-            opacity: 1,              // Outline opacity
-            fillColor: "darkgrey",   // Fill color
-            fillOpacity: 0.5        // Fill opacity (90%)
+            color: "grey",
+            weight: 1,
+            opacity: 1,
+            fillColor: "darkgrey",
+            fillOpacity: 0.25
         };
-
-        // Style for Regional Layer (existing)
         const regionStyle = {
             color: "#ff0000",
             weight: 3,
@@ -97,27 +100,24 @@
             fillOpacity: 0.2
         };
 
-
-        // Modify the zoomend event handler
+        // Label visibility on zoom
         function updateLabelVisibility() {
             const zoom = map.getZoom();
-            const labels = document.querySelectorAll('.city-label');
-            labels.forEach(label => {
+            document.querySelectorAll('.city-label').forEach(label => {
                 label.style.opacity = zoom >= 10 ? 1 : 0;
             });
         }
-
-        // Initial update and event listener
-        updateLabelVisibility();
         map.on('zoomend', updateLabelVisibility);
+        updateLabelVisibility();
 
-        // Load City GeoJSON first (with labels only)
-        fetch('data/city.geojson')
-            .then(response => response.json())
+        // 4) Load City GeoJSON (in cityPane)
+        fetch('https://iskibar2020.github.io/turkish_region_api/city.geojson')
+            .then(res => res.json())
             .then(cityData => {
                 L.geoJSON(cityData, {
+                    pane: 'cityPane',
                     style: cityStyle,
-                    onEachFeature: function (feature, layer) {
+                    onEachFeature: (feature, layer) => {
                         if (feature.properties.TOWN) {
                             layer.bindTooltip(feature.properties.TOWN, {
                                 permanent: true,
@@ -129,70 +129,53 @@
                     }
                 }).addTo(map);
             })
-            .catch(error => console.error('Error loading city data:', error));
+            .catch(err => console.error('Error loading city data:', err));
 
-        // Then load Regional GeoJSON (with popups)
-        fetch('data/regional.geojson')
-            .then(response => response.json())
+        // 5) Load Regional GeoJSON (in regionPane)
+        fetch('https://iskibar2020.github.io/turkish_region_api/regional.geojson')
+            .then(res => res.json())
             .then(regionalData => {
                 const regions = L.geoJSON(regionalData, {
+                    pane: 'regionPane',
                     style: regionStyle,
-                    onEachFeature: function (feature, layer) {
+                    onEachFeature: (feature, layer) => {
                         if (feature.properties.Region) {
-                            // Build clickable city list HTML
                             let cityListHtml = '';
                             if (Array.isArray(feature.properties.Cities)) {
                                 cityListHtml = '<hr>Cities:<ul style="padding-left:1em;margin:0;">' +
-                                    feature.properties.Cities.map(city => {
-                                        // escape quotes in city.name if needed
-                                        return `<li style="margin:2px 0;">
-            <a href="#" 
-               style="text-decoration: none; color: gray;"
-               onmouseover="this.style.color='maroon';" 
-               onmouseout="this.style.color='gray';"
-               onclick="zoomToCity(${city.coords[0]}, ${city.coords[1]}, '${city.name.replace(/'/g, "\\'")}'); return false;">
-              ${city.name}
-            </a>
-        </li>`;
-                                    }).join('') +
+                                    feature.properties.Cities.map(city => `
+                                        <li style="margin:2px 0;">
+                                          <a href="#" 
+                                             style="text-decoration:none;color:gray;"
+                                             onmouseover="this.style.color='maroon';" 
+                                             onmouseout="this.style.color='gray';"
+                                             onclick="zoomToCity(${city.coords[0]}, ${city.coords[1]}, '${city.name.replace(/'/g, "\\'")}');return false;">
+                                            ${city.name}
+                                          </a>
+                                        </li>`
+                                    ).join('') +
                                     '</ul>';
                             }
-
-                            // Combine region info + city list
                             const popupHtml = `
-            <div>
-              <strong>${feature.properties.AreaName}</strong><br>
-              <em>${feature.properties.Title}</em><br>
-              ${cityListHtml}
-            </div>
-          `;
+                                <div>
+                                  <strong>${feature.properties.AreaName}</strong><br>
+                                  <em>${feature.properties.Title}</em>
+                                  ${cityListHtml}
+                                </div>`;
                             layer.bindPopup(popupHtml);
                         }
                     }
                 }).addTo(map);
                 map.fitBounds(regions.getBounds());
             })
-            .catch(error => {
-                console.error('Error loading regional data:', error);
+            .catch(err => {
+                console.error('Error loading regional data:', err);
                 alert('Error loading map data.');
             });
 
-        // Add zoom level check for labels
-        map.on('zoomend', function () {
-            const zoom = map.getZoom();
-            const labels = document.querySelectorAll('.city-label');
-
-            labels.forEach(label => {
-                label.style.opacity = zoom >= 10 ? 1 : 0;
-            });
-        });
-
-
-        // 3) Global helper to zoom to a given city and drop a marker
+        // 6) Zoom helper
         function zoomToCity(lat, lng, name) {
-            map.setView([lat, lng], 13);  // adjust zoom level as desired
-
-            // Optional: drop a temporary circle marker with its own popup
+            map.setView([lat, lng], 13);
             L.circleMarker([lat, lng], {
                 radius: 6,
                 fillColor: '#f03',
